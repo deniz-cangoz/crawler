@@ -112,7 +112,11 @@ class CrawlerJob(threading.Thread):
     def run(self):
         """BFS crawl loop running in this thread."""
         conn = get_connection()
-        self._log(conn, f"Crawl started: {self.origin} (depth={self.max_depth})")
+        is_resume = bool(self.visited) or self.url_queue.qsize() > 1
+        if is_resume:
+            self._log(conn, f"Crawl resumed: {self.origin} (depth={self.max_depth})")
+        else:
+            self._log(conn, f"Crawl started: {self.origin} (depth={self.max_depth})")
 
         # Load already-visited URLs for this crawl (for resume support)
         rows = conn.execute(
@@ -120,6 +124,8 @@ class CrawlerJob(threading.Thread):
         ).fetchall()
         for row in rows:
             self.visited.add(row["url"])
+        # Sync counter with DB (important for resume — don't start from 0)
+        self.pages_crawled = len(self.visited)
 
         try:
             while not self._stop_event.is_set():
@@ -201,10 +207,7 @@ class CrawlerJob(threading.Thread):
 
         conn.commit()
         self.pages_crawled += 1
-
-        # Update job progress periodically (every 5 pages)
-        if self.pages_crawled % 5 == 0:
-            self._update_job_status(conn)
+        self._update_job_status(conn)
 
         # Enqueue discovered links at depth + 1
         if depth < self.max_depth:
@@ -254,12 +257,15 @@ class CrawlerJob(threading.Thread):
             return None
 
     def _rate_limit(self):
-        """Sleep if needed to respect hit_rate."""
+        """Sleep if needed to respect hit_rate. Uses short sleeps so stop/pause respond quickly."""
         if self._request_interval <= 0:
             return
         elapsed = time.time() - self._last_request_time
-        if elapsed < self._request_interval:
-            time.sleep(self._request_interval - elapsed)
+        remaining = self._request_interval - elapsed
+        # Sleep in 0.1s chunks so we can respond to stop/pause quickly
+        while remaining > 0 and not self._stop_event.is_set() and self._pause_event.is_set():
+            time.sleep(min(remaining, 0.1))
+            remaining -= 0.1
         self._last_request_time = time.time()
 
     def _log(self, conn, message, level="info"):

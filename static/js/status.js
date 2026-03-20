@@ -101,6 +101,7 @@ async function updateDetail(crawlId) {
         // Stop polling if crawl is done
         if (['completed', 'error', 'stopped'].includes(data.status) && pollInterval) {
             clearInterval(pollInterval);
+            pollInterval = null;
         }
     } catch (err) {
         console.error('Error updating detail:', err);
@@ -129,9 +130,10 @@ async function controlCrawler(crawlId, action) {
     try {
         const res = await fetch(`${API}/api/crawl/${crawlId}/${action}`, { method: 'POST' });
         const data = await res.json();
-        if (data.error) alert(data.error);
-        // Restart polling if resumed
-        if (action === 'resume' && !pollInterval) {
+        if (data.error) {
+            alert(data.error);
+        } else if (action === 'resume' && !pollInterval) {
+            // Restart polling only on successful resume
             pollInterval = setInterval(() => updateDetail(crawlId), 2000);
         }
         await updateDetail(crawlId);

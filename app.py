@@ -84,7 +84,7 @@ def list_crawls():
 def crawl_status(crawl_id):
     """Get status + logs for a specific crawl."""
     status = crawler_service.get_crawler_status(crawl_id)
-    if "error" in status:
+    if status.get("error"):
         return jsonify(status), 404
     logs = crawler_service.get_crawler_logs(crawl_id, limit=50)
     status["logs"] = logs
@@ -167,5 +167,17 @@ def search_page():
 
 # ============================================================
 
+def _recover_stale_jobs():
+    """Mark any 'running' jobs as 'stopped' on startup (they died with the old process)."""
+    from utils.database import get_connection
+    conn = get_connection()
+    try:
+        conn.execute("UPDATE crawl_jobs SET status = 'stopped' WHERE status IN ('running', 'paused')")
+        conn.commit()
+    finally:
+        conn.close()
+
+
 if __name__ == "__main__":
+    _recover_stale_jobs()
     app.run(debug=True, host="0.0.0.0", port=5000)

@@ -118,7 +118,17 @@ def stop_crawler(crawl_id):
     with _lock:
         job = _active_crawlers.get(crawl_id)
     if not job or not job.is_alive():
-        return {"error": "Crawler not active"}
+        # Update DB status anyway (thread may have died)
+        conn = get_connection()
+        try:
+            conn.execute(
+                "UPDATE crawl_jobs SET status = 'stopped', updated_at = ? WHERE id = ?",
+                (datetime.now(timezone.utc).isoformat(), crawl_id),
+            )
+            conn.commit()
+        finally:
+            conn.close()
+        return {"status": "stopped", "crawl_id": crawl_id}
     job.stop()
     return {"status": "stopped", "crawl_id": crawl_id}
 
@@ -128,7 +138,7 @@ def pause_crawler(crawl_id):
     with _lock:
         job = _active_crawlers.get(crawl_id)
     if not job or not job.is_alive():
-        return {"error": "Crawler not active"}
+        return {"error": "Crawler is not active"}
     job.pause()
     return {"status": "paused", "crawl_id": crawl_id}
 
@@ -163,7 +173,8 @@ def resume_crawler(crawl_id):
             resume_queue = [tuple(item) for item in json.loads(queue_row["message"])]
 
         if not resume_queue:
-            return {"error": "No saved queue to resume from"}
+            # No queue saved — crawl was likely complete or queue was empty at stop time
+            return {"error": "No URLs left to resume — the crawl was complete or queue was empty when stopped"}
 
         new_job = CrawlerJob(
             crawl_id=crawl_id,
