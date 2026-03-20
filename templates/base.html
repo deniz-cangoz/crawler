@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}Web Crawler{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <nav>
+        <a href="/" class="logo">WebCrawler</a>
+        <a href="/" id="nav-crawler">Crawler</a>
+        <a href="/status" id="nav-status">Status</a>
+        <a href="/search" id="nav-search">Search</a>
+    </nav>
+
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+
+    {% block scripts %}{% endblock %}
+    <script>
+        // Highlight active nav link
+        const path = window.location.pathname;
+        document.querySelectorAll('nav a:not(.logo)').forEach(a => {
+            if (a.getAttribute('href') === path ||
+                (path.startsWith('/status') && a.id === 'nav-status')) {
+                a.classList.add('active');
+            }
+        });
+    </script>
+</body>
+</html>

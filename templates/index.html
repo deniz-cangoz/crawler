@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}Crawler - Start{% endblock %}
+
+{% block content %}
+<h1>Start a New Crawl</h1>
+
+<div class="card">
+    <form id="crawl-form">
+        <label for="origin">Origin URL</label>
+        <input type="url" id="origin" placeholder="https://example.com" required>
+
+        <div class="form-row">
+            <div>
+                <label for="max_depth">Max Depth (k)</label>
+                <input type="number" id="max_depth" value="2" min="1" max="100">
+            </div>
+            <div>
+                <label for="hit_rate">Hit Rate (req/sec)</label>
+                <input type="number" id="hit_rate" value="10" min="1" max="100" step="1">
+            </div>
+            <div>
+                <label for="max_urls">Max URLs</label>
+                <input type="number" id="max_urls" value="500" min="10" max="10000">
+            </div>
+            <div>
+                <label for="max_queue">Queue Capacity</label>
+                <input type="number" id="max_queue" value="10000" min="100" max="100000">
+            </div>
+        </div>
+
+        <button type="submit" class="btn btn-primary">Start Crawl</button>
+    </form>
+</div>
+
+<!-- Stats -->
+<div class="stats-bar" id="stats-bar">
+    <div class="stat-card">
+        <div class="stat-value" id="stat-jobs">-</div>
+        <div class="stat-label">Total Jobs</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-pages">-</div>
+        <div class="stat-label">Pages Indexed</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-words">-</div>
+        <div class="stat-label">Unique Words</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-value" id="stat-active">-</div>
+        <div class="stat-label">Active Crawlers</div>
+    </div>
+</div>
+
+<!-- Recent jobs -->
+<h2>Recent Crawl Jobs</h2>
+<div class="card">
+    <table>
+        <thead>
+            <tr>
+                <th>Origin</th>
+                <th>Depth</th>
+                <th>Pages</th>
+                <th>Status</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody id="jobs-table">
+            <tr><td colspan="5" class="empty-state">Loading...</td></tr>
+        </tbody>
+    </table>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/crawler.js"></script>
+{% endblock %}

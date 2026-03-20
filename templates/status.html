@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Crawler Status{% endblock %}
+
+{% block content %}
+<h1>Crawler Status</h1>
+
+<div id="status-content">
+    <!-- If no crawl_id in URL, show a list to pick from -->
+    <div id="pick-crawler" class="card">
+        <h2>Select a Crawler</h2>
+        <table>
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Origin</th>
+                    <th>Status</th>
+                    <th>Pages</th>
+                </tr>
+            </thead>
+            <tbody id="crawler-list">
+                <tr><td colspan="4" class="empty-state">Loading...</td></tr>
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Shown when a specific crawler is selected -->
+    <div id="crawler-detail" style="display:none;">
+        <div class="stats-bar">
+            <div class="stat-card">
+                <div class="stat-value" id="detail-status">-</div>
+                <div class="stat-label">Status</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="detail-pages">-</div>
+                <div class="stat-label">Pages Crawled</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="detail-queue">-</div>
+                <div class="stat-label">Queue Size</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-value" id="detail-depth">-</div>
+                <div class="stat-label">Max Depth</div>
+            </div>
+        </div>
+
+        <div class="card">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1rem;">
+                <h2 style="margin:0;">Crawl Info</h2>
+                <div class="btn-group" id="control-buttons"></div>
+            </div>
+            <table>
+                <tr><td style="color:var(--text-dim)">Crawler ID</td><td id="detail-id">-</td></tr>
+                <tr><td style="color:var(--text-dim)">Origin</td><td id="detail-origin">-</td></tr>
+                <tr><td style="color:var(--text-dim)">Hit Rate</td><td id="detail-hitrate">-</td></tr>
+                <tr><td style="color:var(--text-dim)">Max URLs</td><td id="detail-maxurls">-</td></tr>
+                <tr><td style="color:var(--text-dim)">Queue Capacity</td><td id="detail-maxqueue">-</td></tr>
+            </table>
+        </div>
+
+        <div class="card">
+            <h2>Live Logs</h2>
+            <div class="log-box" id="log-box">
+                <div class="empty-state">Waiting for logs...</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/status.js"></script>
+{% endblock %}

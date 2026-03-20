@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% block title %}Search{% endblock %}
+
+{% block content %}
+<h1>Search Indexed Pages</h1>
+
+<div class="card">
+    <form id="search-form" style="display:flex; gap:0.8rem; align-items:flex-end;">
+        <div style="flex:1;">
+            <label for="query">Search Query</label>
+            <input type="text" id="query" placeholder="Enter search terms..." style="margin-bottom:0;" required>
+        </div>
+        <div>
+            <label for="sort">Sort by</label>
+            <select id="sort" style="margin-bottom:0;">
+                <option value="relevance">Relevance</option>
+                <option value="frequency">Frequency</option>
+                <option value="depth">Depth</option>
+            </select>
+        </div>
+        <button type="submit" class="btn btn-primary" style="height:38px;">Search</button>
+    </form>
+</div>
+
+<div id="search-info" style="display:none; margin-bottom:1rem;">
+    <span id="result-count" style="color:var(--text-dim);"></span>
+    <span id="query-words" style="color:var(--text-dim); margin-left:1rem;"></span>
+</div>
+
+<div id="search-results">
+    <div class="empty-state">Enter a query to search indexed pages.</div>
+</div>
+
+<!-- Pagination -->
+<div id="pagination" style="display:none; text-align:center; margin-top:1.5rem;">
+    <button class="btn btn-sm" id="prev-btn" onclick="changePage(-1)">Previous</button>
+    <span id="page-info" style="margin:0 1rem; color:var(--text-dim);"></span>
+    <button class="btn btn-sm" id="next-btn" onclick="changePage(1)">Next</button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="/static/js/search.js"></script>
+{% endblock %}
