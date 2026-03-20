@@ -12,7 +12,7 @@ from collections import Counter
 
 
 # Tags whose content we want to skip entirely
-SKIP_TAGS = {"script", "style", "noscript", "svg", "head"}
+SKIP_TAGS = {"script", "style", "noscript", "svg"}
 
 
 class _PageParser(HTMLParser):

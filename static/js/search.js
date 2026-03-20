@@ -93,6 +93,24 @@ function truncate(str, max) {
     return str.length > max ? str.substring(0, max) + '...' : str;
 }
 
+// "I'm Feeling Lucky" — pick a random indexed word
+async function feelingLucky() {
+    try {
+        const res = await fetch(`${API}/api/search/random`);
+        const data = await res.json();
+        if (data.word) {
+            document.getElementById('query').value = data.word;
+            currentQuery = data.word;
+            currentOffset = 0;
+            doSearch();
+        } else {
+            alert(data.error || 'No indexed words yet. Run a crawl first!');
+        }
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
 // Check for query param in URL (e.g., /search?q=test)
 const urlParams = new URLSearchParams(window.location.search);
 const q = urlParams.get('q');

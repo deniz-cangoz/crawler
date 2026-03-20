@@ -127,6 +127,12 @@ def search():
     return jsonify(result)
 
 
+@app.route("/api/search/random", methods=["GET"])
+def random_word():
+    """Get a random indexed word for 'I'm Feeling Lucky'."""
+    return jsonify(search_service.get_random_word())
+
+
 @app.route("/api/stats", methods=["GET"])
 def stats():
     """System statistics."""

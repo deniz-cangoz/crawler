@@ -49,8 +49,40 @@ Open http://localhost:5000 in your browser.
 
 ### 3. Search
 - Go to the search page (`/search`)
-- Enter keywords
+- Enter keywords (or click "I'm Feeling Lucky" for a random word)
 - Results show: URL, origin URL, depth, relevance score
+
+## API Examples
+
+```bash
+# Start a crawl
+curl -X POST http://localhost:5000/api/crawl \
+  -H "Content-Type: application/json" \
+  -d '{"origin": "https://example.com", "max_depth": 2, "hit_rate": 10, "max_urls": 500}'
+
+# Check crawl status
+curl http://localhost:5000/api/crawl/<crawl_id>
+
+# List all crawls
+curl http://localhost:5000/api/crawl
+
+# Pause / Resume / Stop a crawl
+curl -X POST http://localhost:5000/api/crawl/<crawl_id>/pause
+curl -X POST http://localhost:5000/api/crawl/<crawl_id>/resume
+curl -X POST http://localhost:5000/api/crawl/<crawl_id>/stop
+
+# Search
+curl "http://localhost:5000/api/search?query=python+web&limit=10&sort=relevance"
+
+# Random word (I'm Feeling Lucky)
+curl http://localhost:5000/api/search/random
+
+# System stats
+curl http://localhost:5000/api/stats
+
+# Clear all data
+curl -X POST http://localhost:5000/api/clear
+```
 
 ## Architecture
 
@@ -65,6 +97,7 @@ utils/
   database.py           # SQLite with WAL mode
 templates/              # Jinja2 HTML templates
 static/                 # CSS and JavaScript
+tests/                  # Unit tests
 ```
 
 ### Key Design Decisions
@@ -75,7 +108,7 @@ static/                 # CSS and JavaScript
 - **Bounded queue + rate limiting**: Back pressure prevents uncontrolled resource usage
 - **Inverted index in SQL**: B-tree indexed word lookups with prefix matching support
 
-## API
+## API Reference
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
@@ -85,9 +118,31 @@ static/                 # CSS and JavaScript
 | POST | `/api/crawl/<id>/stop` | Stop crawl |
 | POST | `/api/crawl/<id>/pause` | Pause crawl |
 | POST | `/api/crawl/<id>/resume` | Resume crawl |
-| GET | `/api/search?query=...&limit=20&offset=0&sort=relevance` | Search |
+| GET | `/api/search?query=...` | Search indexed pages |
+| GET | `/api/search/random` | Random word (I'm Feeling Lucky) |
 | GET | `/api/stats` | System statistics |
 | POST | `/api/clear` | Clear all data |
+
+## Testing
+
+```bash
+# Run all tests
+python -m unittest discover tests/ -v
+```
+
+54 unit tests covering:
+- HTML parser (text extraction, link extraction, word counting, edge cases)
+- Search service (exact match, prefix match, multi-word, pagination, sorting)
+- Crawler job (initialization, controls, back pressure, rate limiting)
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Port 5000 in use | Change port in `app.py`: `app.run(port=5001)` |
+| SSL errors during crawl | The crawler has a fallback to unverified SSL for problematic sites |
+| No search results | Make sure a crawl has completed first — search queries the indexed data |
+| Crawl seems stuck | Check the status page for queue size and logs. Try reducing `hit_rate` |
 
 ## Tech Stack
 

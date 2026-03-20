@@ -1,8 +1,38 @@
+# Python
 __pycache__/
-*.pyc
-*.pyo
-data/
+*.py[cod]
+*$py.class
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Virtual environment
 venv/
-.env
-*.db
+env/
+.venv/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
 .DS_Store
+Thumbs.db
+desktop.ini
+
+# Project data
+data/
+*.db
+
+# Environment
+.env
+.env.local
+
+# Coverage
+htmlcov/
+.coverage
+.coverage.*

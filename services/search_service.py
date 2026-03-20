@@ -12,6 +12,7 @@ Returns triples: (relevant_url, origin_url, depth) as required.
 
 from utils.database import get_connection
 import re
+import random
 
 
 def search(query, page_limit=20, page_offset=0, sort_by="relevance"):
@@ -121,5 +122,22 @@ def search(query, page_limit=20, page_offset=0, sort_by="relevance"):
             "query_words": words,
         }
 
+    finally:
+        conn.close()
+
+
+def get_random_word():
+    """
+    Pick a random indexed word for "I'm Feeling Lucky" feature.
+    Returns the word so the frontend can auto-search it.
+    """
+    conn = get_connection()
+    try:
+        row = conn.execute(
+            "SELECT DISTINCT word FROM word_index ORDER BY RANDOM() LIMIT 1"
+        ).fetchone()
+        if not row:
+            return {"error": "No indexed words yet"}
+        return {"word": row["word"]}
     finally:
         conn.close()
