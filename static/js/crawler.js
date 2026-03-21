@@ -89,6 +89,19 @@ function renderJobs(jobs) {
     }).join('');
 }
 
+// ── Clear All Data ──
+async function clearAllData() {
+    if (!confirm('Are you sure? This will delete ALL crawl jobs, pages, and search index.')) return;
+    try {
+        const res = await fetch(`${API}/api/clear`, { method: 'POST' });
+        const data = await res.json();
+        alert(data.message || 'All data cleared');
+        loadDashboard();
+    } catch (err) {
+        alert('Error: ' + err.message);
+    }
+}
+
 // Load on page ready, then refresh every 3 seconds
 loadDashboard();
 setInterval(loadDashboard, 3000);
