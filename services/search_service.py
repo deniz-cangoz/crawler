@@ -1,11 +1,11 @@
 """
 Search service — queries the word_index to find relevant URLs.
 
-Relevancy model (simple but effective):
-  - Each query word is searched in the word_index table
-  - Scoring = sum of word frequencies across matching pages
-  - Exact word match scores higher than prefix match
+Assignment-compatible relevancy model:
+  - Exact match score = (frequency * 10) + 1000 - (depth * 5)
+  - Prefix matches are only used when no exact match exists for that query word
   - Results are grouped by URL to avoid duplicates
+  - The API returns both `relevance_score` and legacy `score`
 
 Returns triples: (relevant_url, origin_url, depth) as required.
 """
@@ -13,6 +13,22 @@ Returns triples: (relevant_url, origin_url, depth) as required.
 from utils.database import get_connection
 import re
 import random
+
+
+def _ensure_result(url_scores, row):
+    """Create the grouped result object for a URL if needed."""
+    key = row["url"]
+    if key not in url_scores:
+        url_scores[key] = {
+            "url": row["url"],
+            "origin_url": row["origin_url"],
+            "depth": row["depth"],
+            "relevance_score": 0,
+            "total_frequency": 0,
+            "matched_words": set(),
+            "match_types": set(),
+        }
+    return url_scores[key]
 
 
 def search(query, page_limit=20, page_offset=0, sort_by="relevance"):
@@ -35,35 +51,27 @@ def search(query, page_limit=20, page_offset=0, sort_by="relevance"):
 
     conn = get_connection()
     try:
-        # Build a query that scores each URL by total frequency of matching words.
-        # We use LIKE for prefix matching: 'prog' matches 'programming'.
-        # Exact matches get a 10x bonus.
-
-        # For each word, find matching entries
-        url_scores = {}  # url → {score, origin_url, depth, matched_words}
+        # Group scores by URL while keeping the current origin/depth metadata.
+        url_scores = {}  # url -> aggregated metadata
 
         for word in words:
-            # Exact match
-            rows = conn.execute(
+            exact_rows = conn.execute(
                 """SELECT url, origin_url, depth, frequency
                    FROM word_index WHERE word = ?""",
                 (word,),
             ).fetchall()
 
-            for row in rows:
-                key = row["url"]
-                if key not in url_scores:
-                    url_scores[key] = {
-                        "url": row["url"],
-                        "origin_url": row["origin_url"],
-                        "depth": row["depth"],
-                        "score": 0,
-                        "matched_words": set(),
-                    }
-                url_scores[key]["score"] += row["frequency"] * 10  # exact bonus
-                url_scores[key]["matched_words"].add(word)
+            if exact_rows:
+                for row in exact_rows:
+                    result = _ensure_result(url_scores, row)
+                    result["relevance_score"] += (
+                        row["frequency"] * 10 + 1000 - row["depth"] * 5
+                    )
+                    result["total_frequency"] += row["frequency"]
+                    result["matched_words"].add(word)
+                    result["match_types"].add("exact")
+                continue
 
-            # Prefix match (words starting with query word, but not exact)
             rows = conn.execute(
                 """SELECT url, origin_url, depth, frequency
                    FROM word_index WHERE word LIKE ? AND word != ?""",
@@ -71,33 +79,32 @@ def search(query, page_limit=20, page_offset=0, sort_by="relevance"):
             ).fetchall()
 
             for row in rows:
-                key = row["url"]
-                if key not in url_scores:
-                    url_scores[key] = {
-                        "url": row["url"],
-                        "origin_url": row["origin_url"],
-                        "depth": row["depth"],
-                        "score": 0,
-                        "matched_words": set(),
-                    }
-                url_scores[key]["score"] += row["frequency"]
-                url_scores[key]["matched_words"].add(word)
+                result = _ensure_result(url_scores, row)
+                result["relevance_score"] += row["frequency"] * 10 - row["depth"] * 5
+                result["total_frequency"] += row["frequency"]
+                result["matched_words"].add(word)
+                result["match_types"].add("prefix")
 
         # Convert to list and sort
         results = list(url_scores.values())
 
-        # Bonus for matching more query words
         for r in results:
-            r["score"] += len(r["matched_words"]) * 100
-            r["matched_words"] = list(r["matched_words"])  # set → list for JSON
+            r["matched_words"] = sorted(r["matched_words"])
+            r["match_types"] = sorted(r["match_types"])
 
         # Sort
         if sort_by == "depth":
-            results.sort(key=lambda r: r["depth"])
+            results.sort(key=lambda r: (r["depth"], -r["relevance_score"], r["url"]))
         elif sort_by == "frequency":
-            results.sort(key=lambda r: r["score"], reverse=True)
-        else:  # relevance (default) — score with depth penalty
-            results.sort(key=lambda r: r["score"] - r["depth"] * 5, reverse=True)
+            results.sort(
+                key=lambda r: (r["total_frequency"], r["relevance_score"], -r["depth"], r["url"]),
+                reverse=True,
+            )
+        else:  # relevance (default)
+            results.sort(
+                key=lambda r: (r["relevance_score"], r["total_frequency"], -r["depth"], r["url"]),
+                reverse=True,
+            )
 
         total = len(results)
 
@@ -108,10 +115,14 @@ def search(query, page_limit=20, page_offset=0, sort_by="relevance"):
         formatted = [
             {
                 "relevant_url": r["url"],
+                "url": r["url"],
                 "origin_url": r["origin_url"],
                 "depth": r["depth"],
-                "score": r["score"],
+                "relevance_score": r["relevance_score"],
+                "score": r["relevance_score"],
+                "total_frequency": r["total_frequency"],
                 "matched_words": r["matched_words"],
+                "match_types": r["match_types"],
             }
             for r in results
         ]
@@ -120,6 +131,7 @@ def search(query, page_limit=20, page_offset=0, sort_by="relevance"):
             "results": formatted,
             "total_results": total,
             "query_words": words,
+            "sort_by": sort_by,
         }
 
     finally:

@@ -31,7 +31,7 @@ pip install -r requirements.txt
 python app.py
 ```
 
-Open http://localhost:5000 in your browser.
+Open http://localhost:3600 in your browser.
 
 ## Usage
 
@@ -56,32 +56,33 @@ Open http://localhost:5000 in your browser.
 
 ```bash
 # Start a crawl
-curl -X POST http://localhost:5000/api/crawl \
+curl -X POST http://localhost:3600/api/crawl \
   -H "Content-Type: application/json" \
   -d '{"origin": "https://example.com", "max_depth": 2, "hit_rate": 10, "max_urls": 500}'
 
 # Check crawl status
-curl http://localhost:5000/api/crawl/<crawl_id>
+curl http://localhost:3600/api/crawl/<crawl_id>
 
 # List all crawls
-curl http://localhost:5000/api/crawl
+curl http://localhost:3600/api/crawl
 
 # Pause / Resume / Stop a crawl
-curl -X POST http://localhost:5000/api/crawl/<crawl_id>/pause
-curl -X POST http://localhost:5000/api/crawl/<crawl_id>/resume
-curl -X POST http://localhost:5000/api/crawl/<crawl_id>/stop
+curl -X POST http://localhost:3600/api/crawl/<crawl_id>/pause
+curl -X POST http://localhost:3600/api/crawl/<crawl_id>/resume
+curl -X POST http://localhost:3600/api/crawl/<crawl_id>/stop
 
 # Search
-curl "http://localhost:5000/api/search?query=python+web&limit=10&sort=relevance"
+curl "http://localhost:3600/search?query=python&sortBy=relevance"
+curl "http://localhost:3600/api/search?query=python+web&limit=10&sort=relevance"
 
 # Random word (I'm Feeling Lucky)
-curl http://localhost:5000/api/search/random
+curl http://localhost:3600/api/search/random
 
 # System stats
-curl http://localhost:5000/api/stats
+curl http://localhost:3600/api/stats
 
 # Clear all data
-curl -X POST http://localhost:5000/api/clear
+curl -X POST http://localhost:3600/api/clear
 ```
 
 ## Architecture
@@ -107,6 +108,7 @@ tests/                  # Unit tests
 - **Thread-per-crawl**: Each crawl runs as a daemon thread; simple and predictable
 - **Bounded queue + rate limiting**: Back pressure prevents uncontrolled resource usage
 - **Inverted index in SQL**: B-tree indexed word lookups with prefix matching support
+- **Assignment raw storage export**: indexed data is also written to `data/storage/p.data`
 
 ## API Reference
 

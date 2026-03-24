@@ -136,6 +136,7 @@ class TestSearchService(unittest.TestCase):
             self.assertIn("relevant_url", r)
             self.assertIn("origin_url", r)
             self.assertIn("depth", r)
+            self.assertIn("relevance_score", r)
 
     def test_special_characters_in_query(self):
         """Query with special chars should not crash."""
@@ -143,6 +144,14 @@ class TestSearchService(unittest.TestCase):
         result = search("python!@#$%")
         # Should still find 'python' after normalization
         self.assertGreater(result["total_results"], 0)
+
+    def test_assignment_formula_for_exact_match(self):
+        """Exact-match relevance should follow the assignment formula."""
+        from services.search_service import search
+        result = search("python")
+        top = result["results"][0]
+        self.assertEqual(top["relevant_url"], "https://python.org")
+        self.assertEqual(top["relevance_score"], 1500)
 
 
 if __name__ == "__main__":

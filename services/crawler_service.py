@@ -15,6 +15,7 @@ from datetime import datetime, timezone
 
 from utils.database import get_connection
 from utils.crawler_job import CrawlerJob
+from utils.storage_export import sync_storage_file
 
 # In-memory registry of active crawler threads
 _active_crawlers = {}   # crawl_id → CrawlerJob
@@ -219,6 +220,8 @@ def clear_all_data():
             DELETE FROM crawl_logs;
             DELETE FROM crawl_jobs;
         """)
+        conn.commit()
+        sync_storage_file(conn)
         return {"status": "cleared"}
     finally:
         conn.close()

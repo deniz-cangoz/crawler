@@ -18,11 +18,24 @@ Pages:
   /search     → search page
 """
 
+import os
 from flask import Flask, request, jsonify, render_template
 from urllib.parse import urlparse
 from services import crawler_service, search_service
+from utils.storage_export import sync_storage_file
 
 app = Flask(__name__)
+
+
+def _search_request_wants_json():
+    """
+    Return True when /search should behave like the assignment API endpoint.
+
+    Browser navigation to /search?query=... should keep rendering the search page,
+    while AJAX/API requests can still receive JSON from the same route.
+    """
+    accept = request.headers.get("Accept", "")
+    return request.args.get("format") == "json" or "application/json" in accept
 
 
 # ---- CORS ----
@@ -121,7 +134,7 @@ def search():
 
     page_limit = request.args.get("limit", 20, type=int)
     page_offset = request.args.get("offset", 0, type=int)
-    sort_by = request.args.get("sort", "relevance")
+    sort_by = request.args.get("sortBy") or request.args.get("sort", "relevance")
 
     result = search_service.search(query, page_limit, page_offset, sort_by)
     return jsonify(result)
@@ -162,6 +175,16 @@ def status_page(crawl_id=None):
 
 @app.route("/search")
 def search_page():
+    # Assignment compatibility:
+    #   GET /search?query=<word>&sortBy=relevance
+    # Frontend page loads still render HTML, while API-style requests can ask for JSON.
+    query = request.args.get("query", "").strip()
+    if query and _search_request_wants_json():
+        page_limit = request.args.get("limit", 20, type=int)
+        page_offset = request.args.get("offset", 0, type=int)
+        sort_by = request.args.get("sortBy") or request.args.get("sort", "relevance")
+        result = search_service.search(query, page_limit, page_offset, sort_by)
+        return jsonify(result)
     return render_template("search.html")
 
 
@@ -174,10 +197,11 @@ def _recover_stale_jobs():
     try:
         conn.execute("UPDATE crawl_jobs SET status = 'stopped' WHERE status IN ('running', 'paused')")
         conn.commit()
+        sync_storage_file(conn)
     finally:
         conn.close()
 
 
 if __name__ == "__main__":
     _recover_stale_jobs()
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", "3600")))

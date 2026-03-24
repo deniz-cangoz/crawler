@@ -25,7 +25,9 @@ Thumbs.db
 desktop.ini
 
 # Project data
-data/
+data/*
+!data/storage/
+!data/storage/p.data
 *.db
 
 # Environment

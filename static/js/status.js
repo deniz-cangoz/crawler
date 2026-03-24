@@ -76,6 +76,7 @@ async function updateDetail(crawlId) {
         document.getElementById('detail-pages').textContent = data.pages_crawled || 0;
         document.getElementById('detail-queue').textContent = data.queue_size || 0;
         document.getElementById('detail-depth').textContent = data.max_depth || '-';
+        renderBackPressure(data);
 
         // Info table
         document.getElementById('detail-id').textContent = crawlId;
@@ -83,6 +84,7 @@ async function updateDetail(crawlId) {
         document.getElementById('detail-hitrate').textContent = `${data.hit_rate || '-'} req/sec`;
         document.getElementById('detail-maxurls').textContent = data.max_urls || '-';
         document.getElementById('detail-maxqueue').textContent = data.max_queue || '-';
+        document.getElementById('detail-queueusage').textContent = formatQueueUsage(data.queue_size, data.max_queue);
 
         // Control buttons
         renderControlButtons(crawlId, data.status);
@@ -106,6 +108,41 @@ async function updateDetail(crawlId) {
     } catch (err) {
         console.error('Error updating detail:', err);
     }
+}
+
+function formatQueueUsage(queueSize, maxQueue) {
+    const size = queueSize || 0;
+    const capacity = maxQueue || 0;
+    if (!capacity) return `${size}`;
+    const pct = Math.round((size / capacity) * 100);
+    return `${size} / ${capacity} (${pct}%)`;
+}
+
+function renderBackPressure(data) {
+    const el = document.getElementById('detail-pressure');
+    const queueSize = data.queue_size || 0;
+    const maxQueue = data.max_queue || 0;
+
+    if (!maxQueue) {
+        el.textContent = 'Unknown';
+        el.style.color = 'var(--text)';
+        return;
+    }
+
+    const pct = Math.round((queueSize / maxQueue) * 100);
+    let label = 'Low';
+    let color = 'var(--success)';
+
+    if (pct >= 90) {
+        label = 'High';
+        color = 'var(--danger)';
+    } else if (pct >= 60) {
+        label = 'Medium';
+        color = 'var(--warn)';
+    }
+
+    el.textContent = `${label} (${pct}%)`;
+    el.style.color = color;
 }
 
 function renderControlButtons(crawlId, status) {

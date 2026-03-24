@@ -1,17 +1,5 @@
 # Recommendations for Production Deployment
 
-## Storage
+For production, I would separate the crawler and search paths into independently scalable services while replacing SQLite with storage better suited to each workload. Crawl job state and frontier management should move to a durable queue or key-value system such as Redis or SQS, while the inverted index should be written into a dedicated search engine such as Elasticsearch, OpenSearch, or Meilisearch. This preserves the current architecture's clean split between indexing and querying, but gives search lower latency and gives crawling more resilient coordination under heavier load.
 
-The current system uses SQLite, which works well for single-machine localhost deployment. For production, the storage layer should be split into purpose-built databases:
-
-- **Crawl metadata and job state** should move to a key-value store like Redis or DynamoDB. These are write-heavy during crawling and benefit from in-memory speed. Job queues could leverage Redis Streams or a dedicated message broker (RabbitMQ, SQS) for distributed coordination.
-- **The inverted word index** should be migrated to a dedicated search engine such as Elasticsearch or Meilisearch. These systems provide proper TF-IDF scoring, fuzzy matching, stemming, and sub-millisecond query latency at scale. The current alphabetical prefix matching is a reasonable starting point but lacks the sophistication needed for production-quality search results.
-- **Visited URL tracking** should use a probabilistic data structure like a Bloom filter for fast membership checks during crawling, backed by a persistent store (PostgreSQL or BigQuery) for analytics and historical tracking.
-
-## Scaling and Architecture
-
-The crawler and search components should be deployed and scaled independently. The crawler is CPU and network-bound, while search is memory and I/O-bound — they have different scaling profiles.
-
-For the crawler, the single-threaded-per-job model should evolve into a distributed worker architecture. A central scheduler distributes URL batches to worker nodes, which can be scaled horizontally across regions. Each worker should implement proper connection pooling, DNS caching, and respect `robots.txt` and `Crawl-Delay` directives. Back pressure should be extended to include memory/CPU-based throttling and per-domain rate limiting (not just global rate limiting) to be polite to target servers. For search, the inverted index should be sharded by word prefix or hash, with read replicas for availability. A caching layer (Redis/Memcached) for frequent queries would reduce latency significantly.
-
-Additional production concerns include: monitoring and observability (Prometheus metrics for crawl throughput, queue depth, error rates; Grafana dashboards for operational visibility), compliance with robots.txt and legal requirements around web scraping, graceful degradation and circuit breakers for unreachable domains, and proper authentication/authorization for the management API.
+I would also strengthen operational controls around politeness, observability, and recovery. In practice that means per-domain rate limiting, `robots.txt` awareness, retry policies with circuit breakers, and metrics for crawl throughput, queue depth, indexing lag, and query latency. From there, the next step would be to move from the current single-machine worker model to a distributed worker pool so indexing can scale horizontally without changing the user-facing API or search workflow.

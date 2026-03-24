@@ -25,6 +25,7 @@ from datetime import datetime, timezone
 
 from utils.html_parser import parse_html
 from utils.database import get_connection
+from utils.storage_export import sync_storage_file
 
 
 class CrawlerJob(threading.Thread):
@@ -56,6 +57,7 @@ class CrawlerJob(threading.Thread):
         self.pages_crawled = 0
         self.status = "running"
         self.error = None
+        self.fetch_failures = 0
 
         # Control events
         self._stop_event = threading.Event()
@@ -158,7 +160,13 @@ class CrawlerJob(threading.Thread):
 
             # Finished
             if self.status != "stopped":
-                self.status = "completed"
+                if self.pages_crawled == 0 and self.fetch_failures > 0:
+                    self.status = "error"
+                    self.error = (
+                        f"Failed to fetch any pages ({self.fetch_failures} request failures)"
+                    )
+                else:
+                    self.status = "completed"
             self._log(conn, f"Crawl finished. Pages: {self.pages_crawled}")
 
         except Exception as e:
@@ -170,6 +178,7 @@ class CrawlerJob(threading.Thread):
             # Persist final state
             self._save_queue(conn)
             self._update_job_status(conn)
+            sync_storage_file(conn)
             conn.close()
 
     # ---- internal methods ----
@@ -181,6 +190,8 @@ class CrawlerJob(threading.Thread):
         # Fetch HTML
         html = self._fetch(url)
         if html is None:
+            self.fetch_failures += 1
+            self._log(conn, f"[d={depth}] Failed to fetch HTML: {url}", level="warn")
             return
 
         # Parse
@@ -208,6 +219,7 @@ class CrawlerJob(threading.Thread):
         conn.commit()
         self.pages_crawled += 1
         self._update_job_status(conn)
+        sync_storage_file(conn)
 
         # Enqueue discovered links at depth + 1
         if depth < self.max_depth:
