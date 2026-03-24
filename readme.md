@@ -1,56 +1,55 @@
 # Web Crawler
 
-A web crawler and search engine that runs on localhost. Built with Python, Flask, and SQLite.
+This project is a localhost web crawler and search app built with Python, Flask, and SQLite.
 
 ## Features
 
-- **Index**: BFS web crawl from any URL to configurable depth, with back pressure (bounded queue, rate limiting, URL cap)
-- **Search**: Query indexed pages with relevance scoring, returns `(relevant_url, origin_url, depth)` triples
-- **Live UI**: Start crawls, monitor progress with live logs, search indexed content
-- **Resumable**: Crawls can be paused, stopped, and resumed without losing progress
-- **Concurrent**: Search works while indexing is active (SQLite WAL mode)
+- Crawl from any URL to a chosen depth.
+- Control load with queue limits, request rate limits, and a max URL cap.
+- Search indexed pages with relevance scoring.
+- Keep search available while crawling is still running.
+- Pause, resume, or stop crawl jobs from the UI.
+- Export raw word data to `data/storage/p.data` for assignment checks.
 
 ## Quick Start
 
 ```bash
-# Clone and setup
 git clone https://github.com/deniz-cangoz/crawler.git
 cd crawler
 python -m venv venv
 
-# Activate virtual environment
-# Windows:
+# Windows
 venv\Scripts\activate
-# macOS/Linux:
+
+# macOS/Linux
 source venv/bin/activate
 
-# Install dependencies
 pip install -r requirements.txt
-
-# Run
 python app.py
 ```
 
-Open http://localhost:3600 in your browser.
+Open `http://localhost:3600` in your browser.
 
-## Usage
+## Using the App
 
-### 1. Start a Crawl
-- Go to the home page (`/`)
-- Enter a URL (e.g., `https://en.wikipedia.org/wiki/Web_crawler`)
-- Set depth, hit rate, max URLs, and queue capacity
-- Click "Start Crawl"
+### Start a crawl
 
-### 2. Monitor Progress
-- You'll be redirected to the status page (`/status/<crawl_id>`)
-- See live stats: pages crawled, queue size, status
-- View real-time logs
-- Pause, resume, or stop the crawl
+- Open the home page at `/`.
+- Enter an origin URL.
+- Set depth, hit rate, max URLs, and queue capacity.
+- Click `Start Crawl`.
 
-### 3. Search
-- Go to the search page (`/search`)
-- Enter keywords (or click "I'm Feeling Lucky" for a random word)
-- Results show: URL, origin URL, depth, relevance score
+### Check progress
+
+- Open `/status/<crawl_id>`.
+- Review pages crawled, queue size, and logs.
+- Pause, resume, or stop the job if needed.
+
+### Search indexed pages
+
+- Open `/search`.
+- Enter a query, or use `I'm Feeling Lucky`.
+- Review the URL, origin URL, depth, and relevance score in the results.
 
 ## API Examples
 
@@ -66,7 +65,7 @@ curl http://localhost:3600/api/crawl/<crawl_id>
 # List all crawls
 curl http://localhost:3600/api/crawl
 
-# Pause / Resume / Stop a crawl
+# Pause, resume, or stop a crawl
 curl -X POST http://localhost:3600/api/crawl/<crawl_id>/pause
 curl -X POST http://localhost:3600/api/crawl/<crawl_id>/resume
 curl -X POST http://localhost:3600/api/crawl/<crawl_id>/stop
@@ -75,7 +74,7 @@ curl -X POST http://localhost:3600/api/crawl/<crawl_id>/stop
 curl "http://localhost:3600/search?query=python&sortBy=relevance"
 curl "http://localhost:3600/api/search?query=python+web&limit=10&sort=relevance"
 
-# Random word (I'm Feeling Lucky)
+# Random word
 curl http://localhost:3600/api/search/random
 
 # System stats
@@ -85,70 +84,66 @@ curl http://localhost:3600/api/stats
 curl -X POST http://localhost:3600/api/clear
 ```
 
-## Architecture
+## Project Structure
 
-```
-app.py                  # Flask routes (API + pages)
+```text
+app.py
 services/
-  crawler_service.py    # Crawler lifecycle management
-  search_service.py     # Search query processing
+  crawler_service.py
+  search_service.py
 utils/
-  crawler_job.py        # Threaded BFS crawler engine
-  html_parser.py        # stdlib HTML parser (no BeautifulSoup)
-  database.py           # SQLite with WAL mode
-templates/              # Jinja2 HTML templates
-static/                 # CSS and JavaScript
-tests/                  # Unit tests
+  crawler_job.py
+  html_parser.py
+  database.py
+templates/
+static/
+tests/
 ```
 
-### Key Design Decisions
+## Design Notes
 
-- **SQLite with WAL mode**: Allows search to read while crawler writes — no blocking
-- **stdlib only for crawling**: Uses `urllib`, `html.parser`, `threading`, `queue` — no external crawling libraries
-- **Thread-per-crawl**: Each crawl runs as a daemon thread; simple and predictable
-- **Bounded queue + rate limiting**: Back pressure prevents uncontrolled resource usage
-- **Inverted index in SQL**: B-tree indexed word lookups with prefix matching support
-- **Assignment raw storage export**: indexed data is also written to `data/storage/p.data`
+- SQLite runs in WAL mode, so search can read while the crawler writes.
+- Crawling uses the Python standard library, including `urllib`, `html.parser`, `threading`, and `queue`.
+- Each crawl runs in its own daemon thread.
+- Back pressure comes from queue limits, rate limits, and a max URL cap.
+- Raw index data is also written to `data/storage/p.data`.
 
 ## API Reference
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/crawl` | Start crawl `{origin, max_depth, hit_rate, max_urls, max_queue}` |
-| GET | `/api/crawl` | List all crawls |
-| GET | `/api/crawl/<id>` | Crawl status + logs |
-| POST | `/api/crawl/<id>/stop` | Stop crawl |
-| POST | `/api/crawl/<id>/pause` | Pause crawl |
-| POST | `/api/crawl/<id>/resume` | Resume crawl |
-| GET | `/api/search?query=...` | Search indexed pages |
-| GET | `/api/search/random` | Random word (I'm Feeling Lucky) |
-| GET | `/api/stats` | System statistics |
-| POST | `/api/clear` | Clear all data |
+- `GET /search?query=...&sortBy=relevance` shows the assignment-friendly search route.
+- `POST /api/crawl` starts a crawl with `origin`, `max_depth`, `hit_rate`, `max_urls`, and `max_queue`.
+- `GET /api/crawl` lists crawl jobs.
+- `GET /api/crawl/<id>` returns crawl status and logs.
+- `POST /api/crawl/<id>/stop` stops a crawl.
+- `POST /api/crawl/<id>/pause` pauses a crawl.
+- `POST /api/crawl/<id>/resume` resumes a crawl.
+- `GET /api/search?query=...` searches indexed pages.
+- `GET /api/search/random` returns a random indexed word.
+- `GET /api/stats` returns system statistics.
+- `POST /api/clear` clears stored crawl data.
 
 ## Testing
 
 ```bash
-# Run all tests
 python -m unittest discover tests/ -v
 ```
 
-54 unit tests covering:
-- HTML parser (text extraction, link extraction, word counting, edge cases)
-- Search service (exact match, prefix match, multi-word, pagination, sorting)
-- Crawler job (initialization, controls, back pressure, rate limiting)
+There are 55 unit tests. They cover:
+
+- HTML parsing, text extraction, link extraction, and word counting
+- Search behavior, sorting, pagination, and relevance scoring
+- Crawl job lifecycle, controls, back pressure, and rate limiting
 
 ## Troubleshooting
 
-| Problem | Solution |
-|---------|----------|
-| Port 5000 in use | Change port in `app.py`: `app.run(port=5001)` |
-| SSL errors during crawl | The crawler has a fallback to unverified SSL for problematic sites |
-| No search results | Make sure a crawl has completed first — search queries the indexed data |
-| Crawl seems stuck | Check the status page for queue size and logs. Try reducing `hit_rate` |
+- If port 3600 is busy, set `PORT=3601` before running, or change the port in `app.py`.
+- If you hit SSL errors during a crawl, the crawler can fall back to unverified SSL for problematic sites.
+- If search returns no results, check that at least one crawl has finished and written indexed data.
+- If a crawl looks stuck, open the status page and review queue size and logs. Lowering `hit_rate` can help.
 
 ## Tech Stack
 
 - Python 3
-- Flask (web framework)
-- SQLite (database)
-- Vanilla HTML/CSS/JS (frontend)
+- Flask
+- SQLite
+- Vanilla HTML, CSS, and JavaScript

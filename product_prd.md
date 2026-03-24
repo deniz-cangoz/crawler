@@ -1,99 +1,118 @@
-# Product Requirements Document — Web Crawler
+# Product Requirements Document: Web Crawler
 
 ## Overview
-A web crawler system that exposes two core capabilities: **index** (crawl web pages from a given URL to a specified depth) and **search** (find relevant URLs based on a text query). The system includes a web-based UI for initiating crawls, monitoring progress, and searching indexed content.
+
+This project has two main capabilities: index and search. The index side crawls pages from a given URL up to a chosen depth. The search side returns relevant URLs for a text query. The system also includes a small web UI for starting crawls, checking progress, and searching indexed content.
 
 ## Core Requirements
 
-### 1. Index (`POST /api/crawl`)
-- **Parameters**: `origin` (URL), `max_depth` (k hops), `hit_rate`, `max_queue`, `max_urls`
-- **BFS traversal**: Breadth-first search from origin URL up to depth k
-- **Deduplication**: Never crawl the same URL twice (tracked via visited set + DB)
-- **Back pressure mechanisms**:
-  - Bounded queue (`queue.Queue(maxsize)`) — stops enqueueing when full
-  - Rate limiting — configurable requests per second with sleep-based throttle
-  - Max URL cap — hard stop after N pages crawled
-- **Concurrency**: Each crawl runs as a daemon thread; multiple crawls can run simultaneously
-- **Storage**: SQLite with WAL mode for concurrent read/write access
+### 1. Index
 
-### 2. Search (`GET /api/search`)
-- **Input**: Query string, pagination params, sort option
-- **Output**: List of triples `(relevant_url, origin_url, depth)` with relevance score
-- **Relevancy model**:
-  - Word frequency scoring (exact match 10x bonus)
-  - Prefix matching for partial word matches
-  - Multi-word query bonus (matching more words = higher score)
-  - Depth penalty (shallower pages ranked higher)
-- **Real-time**: Search works while indexing is active (SQLite WAL mode enables concurrent reads)
+Route:
+- `POST /api/crawl`
 
-### 3. UI (Web Interface)
-Three pages served by Flask:
+Inputs:
+- `origin` for the starting URL
+- `max_depth` for the hop limit
+- `hit_rate`, `max_queue`, and `max_urls` for load control
 
-| Page | Purpose |
-|------|---------|
-| `/` (Crawler) | Start new crawls, view stats, see recent jobs |
-| `/status/<id>` | Live crawl status with logs, pause/resume/stop controls |
-| `/search` | Search indexed pages with pagination and sorting |
+Behavior:
+- Uses breadth-first traversal from the origin URL up to depth `k`
+- Avoids revisiting the same URL
+- Runs each crawl in its own daemon thread
+
+Load control:
+- A bounded queue stops new items when the queue is full
+- Rate limiting controls requests per second
+- A max URL cap stops very large crawls
+
+Storage:
+- Uses SQLite with WAL mode for concurrent reads and writes
+- Writes raw storage lines to `data/storage/p.data` for assignment checks
+
+### 2. Search
+
+Routes:
+- `GET /api/search`
+- `GET /search?query=...&sortBy=relevance`
+
+Input:
+- Query string
+- Pagination values
+- Sort option
+
+Output:
+- A list of `(relevant_url, origin_url, depth)` results
+- A `relevance_score` field for ranking
+
+Ranking:
+- Exact matches use `(frequency * 10) + 1000 - (depth * 5)`
+- Prefix fallback is used only if there is no exact match for that query word
+- Results are grouped by URL and sorted by `relevance_score`
+
+Runtime behavior:
+- Search stays available while indexing is active because SQLite WAL mode allows concurrent reads
+
+### 3. UI
+
+Flask serves three pages:
+
+- `/` starts new crawls and shows summary stats
+- `/status/<id>` shows live crawl status, logs, and controls
+- `/search` searches indexed pages with sorting and pagination
 
 ### 4. System State Visibility
-- **Stats dashboard**: Total jobs, pages indexed, unique words, active crawlers
-- **Live logs**: Real-time log entries for each crawl (polled every 2 seconds)
-- **Queue depth**: Visible on status page
-- **Back pressure status**: Logged when queue is full
+
+- Total jobs, indexed pages, unique words, and active crawlers are visible on the dashboard
+- Each crawl has live logs that update during execution
+- Queue depth is visible on the status page
+- Back pressure state is shown on the status page through queue usage
 
 ### 5. Resumability
-- Queue state is persisted to DB when a crawl stops
-- Resume endpoint re-creates the thread with saved queue
-- Visited URLs are loaded from the pages table on resume
+
+- Queue state is persisted to the database when a crawl stops
+- The resume endpoint re-creates the thread with the saved queue
+- Visited URLs are loaded from the `pages` table on resume
 
 ## Architecture
 
-```
-┌─────────────────────────────────────────────────┐
-│  Flask App (app.py)                             │
-│  REST API + serves HTML templates               │
-├─────────────────────────────────────────────────┤
-│  Services Layer                                 │
-│  ├── crawler_service.py  (job lifecycle)        │
-│  └── search_service.py   (query processing)     │
-├─────────────────────────────────────────────────┤
-│  Utils Layer                                    │
-│  ├── crawler_job.py      (threaded BFS engine)  │
-│  ├── html_parser.py      (stdlib HTML parsing)  │
-│  └── database.py         (SQLite + WAL)         │
-├─────────────────────────────────────────────────┤
-│  Frontend (vanilla HTML/CSS/JS)                 │
-│  ├── templates/  (Jinja2 templates)             │
-│  └── static/     (CSS + JS)                     │
-└─────────────────────────────────────────────────┘
+```text
+app.py
+  Flask routes and HTML pages
+services/
+  crawler_service.py
+  search_service.py
+utils/
+  crawler_job.py
+  html_parser.py
+  database.py
+static/
+templates/
 ```
 
 ## Technology Choices
-- **Python 3 + Flask**: Minimal framework, easy to run on localhost
-- **SQLite**: Zero-config database, WAL mode for concurrent access
-- **stdlib only for crawling**: `urllib`, `html.parser`, `threading`, `queue` — no BeautifulSoup, no requests, no Scrapy
-- **Vanilla HTML/CSS/JS**: No React/Vue/build step needed
+
+- Python 3 and Flask keep the project small and easy to run on localhost
+- SQLite gives simple local storage with WAL mode for concurrent access
+- Crawling uses the Python standard library, not external crawler frameworks
+- The frontend uses plain HTML, CSS, and JavaScript
 
 ## API Reference
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/crawl` | Start a new crawl |
-| GET | `/api/crawl` | List all crawl jobs |
-| GET | `/api/crawl/<id>` | Get crawl status + logs |
-| POST | `/api/crawl/<id>/stop` | Stop a crawl |
-| POST | `/api/crawl/<id>/pause` | Pause a crawl |
-| POST | `/api/crawl/<id>/resume` | Resume a crawl |
-| GET | `/api/search?query=...` | Search indexed pages |
-| GET | `/api/stats` | System statistics |
-| POST | `/api/clear` | Clear all data |
+- `POST /api/crawl` starts a new crawl
+- `GET /api/crawl` lists crawl jobs
+- `GET /api/crawl/<id>` returns crawl status and logs
+- `POST /api/crawl/<id>/stop` stops a crawl
+- `POST /api/crawl/<id>/pause` pauses a crawl
+- `POST /api/crawl/<id>/resume` resumes a crawl
+- `GET /search?query=...&sortBy=relevance` supports the assignment search flow
+- `GET /api/search?query=...` searches indexed pages
+- `GET /api/stats` returns system statistics
+- `POST /api/clear` clears stored data
 
 ## Design Decisions
 
-1. **SQLite over flat files**: The assignment requires search to work while indexing is active. SQLite WAL mode handles this naturally. Flat files would require file locking and re-sorting.
-
-2. **Thread-per-crawl (not thread pool within a crawl)**: Keeps the implementation simple and predictable. Multiple concurrent crawls are supported by starting multiple threads.
-
-3. **Inverted index in SQL**: Word → URL mapping stored in `word_index` table with B-tree indexes. Enables prefix matching via `LIKE 'word%'` which SQLite optimizes with the index.
-
-4. **No external crawling libraries**: As required, uses only Python stdlib (`urllib.request`, `html.parser.HTMLParser`, `threading`, `queue`).
+1. SQLite was chosen over flat files because search needs to keep working while indexing is active.
+2. Each crawl runs in its own thread. This keeps the job model simple.
+3. The inverted index lives in the `word_index` table, which keeps lookups fast and supports simple prefix fallback.
+4. Crawling uses only Python standard library modules such as `urllib.request`, `html.parser.HTMLParser`, `threading`, and `queue`.
